@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: AnimeTrackerServer
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/anime_tracker
+    username: postgres
+    password: Dwen2key123
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+jwt:
+  secret: NArLxxoDiEuntV6hSpCDBiSb4SOMySCsL7AFeEbxCdndGCqJoNvGsTOZE91IpHyjz9MXY/dlTBl+uhXIM4DBqg==
+  access-token-expiration: 900000
+
+server:
+  port: 8081
