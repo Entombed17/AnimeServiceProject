@@ -1,25 +1,20 @@
 package com.kenshin.animetrackerserver.security;
 
-import com.kenshin.animetrackerserver.entity.User;
 import com.kenshin.animetrackerserver.repository.UserRepository;
 import com.kenshin.animetrackerserver.service.JwtService;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.net.http.HttpRequest;
 import java.util.Collections;
-import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -44,24 +39,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = authHeader.substring(7);
 
-        String email = jwtService.extractEmail(token);
+        try {
+            Long userId = jwtService.extractUserId(token);
 
-        User user = userRepository
-                .findByEmail(email)
-                .orElse(null);
-
-        if(user != null) {
-            if(jwtService.isTokenValid(token, user)) {
-                List<GrantedAuthority> list = Collections.emptyList();
-                Authentication authentication = new UsernamePasswordAuthenticationToken(
-                      user,
-                      null,
-                        list
-                );
-                SecurityContext securityContext = SecurityContextHolder.getContext();
-                securityContext.setAuthentication(authentication);
-            }
+            userRepository.findById(userId).ifPresent(user -> {
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(user, null, Collections.emptyList());
+                SecurityContextHolder.getContext().setAuthentication(authentication);});
+        } catch (JwtException | IllegalArgumentException exception) {
+            SecurityContextHolder.clearContext();
         }
+
         filterChain.doFilter(request, response);
     }
 }
