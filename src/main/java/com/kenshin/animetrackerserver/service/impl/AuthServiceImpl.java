@@ -2,13 +2,12 @@ package com.kenshin.animetrackerserver.service.impl;
 
 import com.kenshin.animetrackerserver.dto.common.UserResponse;
 import com.kenshin.animetrackerserver.dto.request.auth.LoginRequest;
-import com.kenshin.animetrackerserver.dto.request.auth.RefreshTokenRequest;
 import com.kenshin.animetrackerserver.dto.request.auth.RegisterRequest;
-import com.kenshin.animetrackerserver.dto.response.auth.AccessTokenResponse;
 import com.kenshin.animetrackerserver.dto.response.auth.RegisterAndAuthResponse;
 import com.kenshin.animetrackerserver.entity.RefreshToken;
 import com.kenshin.animetrackerserver.entity.User;
-import com.kenshin.animetrackerserver.repository.RefreshTokenRepository;
+import com.kenshin.animetrackerserver.exception.InvalidCredentialsException;
+import com.kenshin.animetrackerserver.exception.UserAlreadyExistsException;
 import com.kenshin.animetrackerserver.repository.UserRepository;
 import com.kenshin.animetrackerserver.service.AuthService;
 import com.kenshin.animetrackerserver.service.JwtService;
@@ -16,6 +15,9 @@ import com.kenshin.animetrackerserver.service.RefreshTokenService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -30,47 +32,45 @@ public class AuthServiceImpl implements AuthService {
     private final RefreshTokenService refreshTokenService;
 
     @Override
+    @Transactional
     public RegisterAndAuthResponse register(RegisterRequest request) {
-        if(userRepository.existsByUsername(request.getUsername())) {
-            throw new RuntimeException("Username already exists");
+        String email = normalizeEmail(request.getEmail());
+
+        String username = request.getUsername().trim();
+
+        if(userRepository.existsByUsername(username)) {
+            throw new UserAlreadyExistsException("Username already exists");
         }
 
-        if(userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already exists");
+        if(userRepository.existsByEmail(email)) {
+            throw new UserAlreadyExistsException("Email already exists");
         }
 
         User user = new User();
-        user.setUsername(request.getUsername());
-        user.setEmail(request.getEmail());
+        user.setUsername(username);
+        user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
 
         User savedUser = userRepository.save(user);
 
-        String accessToken = jwtService.generateAccessToken(savedUser);
-
-        RefreshToken refreshToken = refreshTokenService.generateRefreshToken(savedUser);
-
-        UserResponse userResponse = new UserResponse(
-                savedUser.getId(),
-                savedUser.getUsername(),
-                savedUser.getEmail()
-        );
-
-        return new RegisterAndAuthResponse(
-                accessToken,
-                refreshToken.getToken(),
-                userResponse
-        );
+        return buildAuthResponse(savedUser);
     }
 
     @Override
+    @Transactional
     public RegisterAndAuthResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.getEmail()).orElseThrow(() -> new RuntimeException("Invalid email or password"));
+        String email = normalizeEmail(request.getEmail());
+
+        User user = userRepository.findByEmail(email).orElseThrow(InvalidCredentialsException::new);
 
         if(!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new RuntimeException("Invalid email or password");
+            throw new InvalidCredentialsException();
         }
 
+        return buildAuthResponse(user);
+    }
+
+    private RegisterAndAuthResponse buildAuthResponse(User user) {
         String accessToken = jwtService.generateAccessToken(user);
 
         RefreshToken refreshToken = refreshTokenService.generateRefreshToken(user);
@@ -86,5 +86,9 @@ public class AuthServiceImpl implements AuthService {
                 refreshToken.getToken(),
                 userResponse
         );
+    }
+
+    private String normalizeEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 }
