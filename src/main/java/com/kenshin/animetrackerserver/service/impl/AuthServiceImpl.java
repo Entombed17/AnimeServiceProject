@@ -8,6 +8,8 @@ import com.kenshin.animetrackerserver.dto.response.auth.AccessTokenResponse;
 import com.kenshin.animetrackerserver.dto.response.auth.RegisterAndAuthResponse;
 import com.kenshin.animetrackerserver.entity.RefreshToken;
 import com.kenshin.animetrackerserver.entity.User;
+import com.kenshin.animetrackerserver.exception.InvalidCredentialsException;
+import com.kenshin.animetrackerserver.exception.UserAlreadyExistsException;
 import com.kenshin.animetrackerserver.repository.RefreshTokenRepository;
 import com.kenshin.animetrackerserver.repository.UserRepository;
 import com.kenshin.animetrackerserver.service.AuthService;
@@ -32,11 +34,11 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public RegisterAndAuthResponse register(RegisterRequest request) {
         if(userRepository.existsByUsername(request.getUsername())) {
-            throw new RuntimeException("Username already exists");
+            throw new UserAlreadyExistsException("Username already exists");
         }
 
         if(userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already exists");
+            throw new UserAlreadyExistsException("Email already exists");
         }
 
         User user = new User();
@@ -65,10 +67,11 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public RegisterAndAuthResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.getEmail()).orElseThrow(() -> new RuntimeException("Invalid email or password"));
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(InvalidCredentialsException::new);
 
         if(!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new RuntimeException("Invalid email or password");
+            throw new InvalidCredentialsException();
         }
 
         String accessToken = jwtService.generateAccessToken(user);
