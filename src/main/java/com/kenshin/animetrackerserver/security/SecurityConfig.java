@@ -24,7 +24,7 @@ public class SecurityConfig {
 
         httpSecurity
                 .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(auth -> auth.requestMatchers("/auth/**").permitAll()
+                .authorizeHttpRequests(auth -> auth.requestMatchers("/auth/**", "/error").permitAll()
                 .anyRequest().authenticated()
         )
                 .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
